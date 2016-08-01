@@ -1,25 +1,25 @@
-package com.navyas.android.tapexchange;
+package com.gankmobile.android.tapexchange;
 
+import android.Manifest;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
 import android.content.Context;
 import android.content.Intent;
 import android.content.OperationApplicationException;
-import android.graphics.Color;
-import android.graphics.Typeface;
+import android.content.pm.PackageManager;
 import android.nfc.NdefMessage;
 import android.nfc.NfcAdapter;
+import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
-import android.support.v7.app.ActionBar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBarActivity;
-import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,33 +30,12 @@ public class NFCDisplayActivity extends ActionBarActivity {
 
     TextView fullName, phoneNum, emailAddr, nickname, organization;
     Button mSaveButton;
+    private static final int REQUEST_CODE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_nfcdisplay);
-
-        android.support.v7.app.ActionBar menu = getSupportActionBar();
-
-        TextView tv = new TextView(getApplicationContext());
-
-        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
-                ActionBar.LayoutParams.MATCH_PARENT,
-                ActionBar.LayoutParams.WRAP_CONTENT);
-
-        tv.setLayoutParams(lp);
-        tv.setText(menu.getTitle());
-        tv.setTextColor(Color.WHITE);
-        Typeface type = Typeface.createFromAsset(getAssets(),"Dashley.ttf");
-        tv.setTypeface(type);
-        tv.setTextSize(30);
-
-        menu.setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
-        menu.setCustomView(tv);
-
-        menu.setDisplayShowHomeEnabled(true);
-        menu.setLogo(R.mipmap.ictapxchangelauncher);
-        menu.setDisplayUseLogoEnabled(true);
 
         fullName = (TextView) findViewById(R.id.full_name_text2);
         phoneNum = (TextView) findViewById(R.id.phone_num_text2);
@@ -65,11 +44,25 @@ public class NFCDisplayActivity extends ActionBarActivity {
         organization = (TextView) findViewById(R.id.organization_text2);
 
         mSaveButton = (Button) findViewById(R.id.save_button);
-        mSaveButton.setTypeface(type);
         mSaveButton.setOnClickListener(new View.OnClickListener() {
+
             @Override
             public void onClick(View v) {
-                WritePhoneContact(fullName.getText() + "", phoneNum.getText() + "", emailAddr.getText() + "", nickname.getText() + "", organization.getText() + "");
+
+                if (ContextCompat.checkSelfPermission(NFCDisplayActivity.this,
+                        Manifest.permission.WRITE_CONTACTS)
+                        == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(NFCDisplayActivity.this,Manifest.permission.READ_CONTACTS )== PackageManager.PERMISSION_GRANTED) {
+                    getData();
+
+                } else {
+                    if (ActivityCompat.shouldShowRequestPermissionRationale(NFCDisplayActivity.this, Manifest.permission.WRITE_CONTACTS)) {
+                        Toast.makeText(getParent(), "Permission Required To Read or Write Contacts", Toast.LENGTH_SHORT).show();
+                    }
+                    ActivityCompat.requestPermissions(NFCDisplayActivity.this, new String[]{Manifest.permission.WRITE_CONTACTS}, REQUEST_CODE);
+                    ActivityCompat.requestPermissions(NFCDisplayActivity.this, new String[]{Manifest.permission.READ_CONTACTS},REQUEST_CODE);
+                }
+
+//                WritePhoneContact(fullName.getText() + "", phoneNum.getText() + "", emailAddr.getText() + "", nickname.getText() + "", organization.getText() + "");
 
                 Intent i = new Intent(getApplicationContext(), MainActivity.class);
                 startActivity(i);
@@ -77,6 +70,16 @@ public class NFCDisplayActivity extends ActionBarActivity {
             }
         });
     }
+        private void getData() {
+            try {
+                WritePhoneContact(fullName.getText() + "", phoneNum.getText() + "", emailAddr.getText() + "", nickname.getText() + "", organization.getText() + "");
+            }
+            catch (Exception e){
+                Toast.makeText(this, "Cannot Write !!", Toast.LENGTH_LONG).show();
+            }
+
+        }
+
 
     @Override
     protected void onResume()
@@ -106,6 +109,21 @@ public class NFCDisplayActivity extends ActionBarActivity {
             emailAddr.setText(contactItems[2]);
             nickname.setText(contactItems[3]);
             organization.setText(contactItems[4]);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_CODE) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getData();
+
+            } else {
+                Toast.makeText(NFCDisplayActivity.this, "Write Contacts Permission Has Not Been Granted!", Toast.LENGTH_SHORT).show();
+
+            }
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
     }
 
@@ -140,24 +158,20 @@ public class NFCDisplayActivity extends ActionBarActivity {
         //Email will be inserted as well
         cntProOper.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)//Step2
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, contactIndex)
-                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Email.DATA, email)
-                .withValue(ContactsContract.CommonDataKinds.Email.TYPE, null)
-                .build());
+                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                .withValue(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME, email).build());
 
         // Insert nickname into contact
         cntProOper.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)//Step2
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID,contactIndex)
-                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Nickname.CONTENT_ITEM_TYPE)
+                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
                 .withValue(ContactsContract.CommonDataKinds.Nickname.NAME, nickname).build());
 
         // Organization
         cntProOper.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)//Step2
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, contactIndex)
-                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Organization.COMPANY, organization)
-                .withValue(ContactsContract.CommonDataKinds.Organization.TYPE, ContactsContract.CommonDataKinds.Organization.TYPE_WORK)
-                .build());
+                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                .withValue(ContactsContract.CommonDataKinds.Organization.COMPANY, organization).build());
         try
         {
             // We will do batch operation to insert all above data
